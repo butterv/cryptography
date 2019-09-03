@@ -70,6 +70,18 @@ func Test_BCrypt_IsCorrectPassword(t *testing.T) {
 			wantErr: nil,
 		},
 		{
+			name: "regular case is correct(password 76 chars)",
+			in: struct {
+				hashedPassword string
+				password       string
+			}{
+				"$2a$10$6bi1p5YxjouGtXIef4eFveWHGDj1li92fA7dXsOA9vwaQGlHZaYh6",
+				"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			},
+			want:    true,
+			wantErr: nil,
+		},
+		{
 			name: "hashed password too short",
 			in: struct {
 				hashedPassword string

@@ -38,6 +38,11 @@ func Test_BCrypt_HashPassword(t *testing.T) {
 			if !isCorrect && tt.wantErr == nil {
 				t.Errorf("IsCorrectPassword(%s, %s)=false, _; want true", got, tt.in)
 			}
+
+			cost, _ := bcrypt.Cost([]byte(got))
+			if cost != bcrypt.DefaultCost && tt.wantErr == nil {
+				t.Errorf("Cost([]byte(%s)=false, _; want true", got)
+			}
 		})
 	}
 }

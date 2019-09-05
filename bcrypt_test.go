@@ -69,20 +69,20 @@ func Test_BCrypt_Cost(t *testing.T) {
 		},
 		{
 			name:    "regular case cost",
-			in:      "$2b$10$0DGBCMWhzppRvF2yVIIdoee9A1qAOq7bk39oQiZXXaQwvb.8o5.xO",
-			want:    10,
+			in:      "$2b$04$0DGBCMWhzppRvF2yVIIdoee9A1qAOq7bk39oQiZXXaQwvb.8o5.xO",
+			want:    4,
 			wantErr: nil,
 		},
-		//{
-		//	name:    "invalid hash",
-		//	in:      "abcdefgh",
-		//	wantErr: ErrInvalidHash,
-		//},
-		//{
-		//	name:    "invalid version",
-		//	in:      "$3b$10$0DGBCMWhzppRvF2yVIIdoee9A1qAOq7bk39oQiZXXaQwvb.8o5.xO",
-		//	wantErr: ErrInvalidVersion,
-		//},
+		{
+			name:    "hash too short",
+			in:      "abcdefgh",
+			wantErr: ErrHashTooShort,
+		},
+		{
+			name:    "invalid hash",
+			in:      "3b$10$0DGBCMWhzppRvF2yVIIdoee9A1qAOq7bk39oQiZXXaQwvb.8o5.xO",
+			wantErr: ErrInvalidHash,
+		},
 	}
 
 	for _, tt := range tests {
@@ -91,10 +91,10 @@ func Test_BCrypt_Cost(t *testing.T) {
 			in := []byte(tt.in)
 			got, err := b.Cost(in)
 			if !reflect.DeepEqual(err, tt.wantErr) {
-				t.Fatalf("Version(%v)=_, %#v; want %#v", in, err, tt.wantErr)
+				t.Fatalf("Cost(%v)=_, %#v; want %#v", in, err, tt.wantErr)
 			}
-			if string(got) != tt.want {
-				t.Errorf("Version(%v)=%s, _; want %s", in, got, tt.want)
+			if got != tt.want {
+				t.Errorf("Cost(%v)=%d, _; want %d", in, got, tt.want)
 			}
 		})
 	}

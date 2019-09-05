@@ -2,6 +2,7 @@ package cryptography
 
 import (
 	"errors"
+	"strconv"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -15,6 +16,12 @@ const (
 	encodedSaltSize    = 22
 	encodedHashSize    = 31
 	minHashSize        = 59
+)
+
+const (
+	MinCost     int = 4  // the minimum allowable cost as passed in to GenerateFromPassword
+	MaxCost     int = 31 // the maximum allowable cost as passed in to GenerateFromPassword
+	DefaultCost int = 10 // the cost that will actually be set if a cost below MinCost is passed into GenerateFromPassword
 )
 
 var ErrMismatchedHashAndPassword = errors.New("crypto/bcrypt: hashedPassword is not the hash of the given password")
@@ -43,24 +50,29 @@ func (*bcryptStruct) Version(hashedBytes []byte) ([]byte, error) {
 	return hashedBytes[1:2], nil
 }
 
-//
-//func (*bcryptStruct) Cost(hashedBytes []byte) (int, error) {
-//	if len(hashedStr) < minHashSize {
-//		return 0, ErrHashTooShort
-//	}
-//
-//	if hashedStr[0] != '$' {
-//		return 0, ErrInvalidHash
-//	}
-//
-//	strs := strings.Split(string(hashedStr, "$")
-//	if len(strs) != 2 {
-//		return 0, ErrInvalidHash
-//	}
-//
-//	hashedbytes := []byte(strs[1])
-//
-//}
+func (*bcryptStruct) Cost(hashedBytes []byte) (int, error) {
+	if len(hashedBytes) < minHashSize {
+		return 0, ErrHashTooShort
+	}
+
+	if hashedBytes[0] != '$' {
+		return 0, ErrInvalidHash
+	}
+
+	if hashedBytes[2] != '$' {
+		cost, err := strconv.Atoi(string(hashedBytes[4:6]))
+		if err != nil {
+			return -1, err
+		}
+		return cost, nil
+	}
+
+	cost, err := strconv.Atoi(string(hashedBytes[5:7]))
+	if err != nil {
+		return -1, err
+	}
+	return cost, nil
+}
 
 func (*bcryptStruct) HashPassword(password string) (string, error) {
 	if password == "" {

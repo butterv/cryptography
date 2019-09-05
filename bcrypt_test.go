@@ -23,8 +23,8 @@ func Test_BCrypt_Version(t *testing.T) {
 		},
 		{
 			name:    "regular case version 2b",
-			want:    "2b",
 			in:      "$2b$10$0DGBCMWhzppRvF2yVIIdoee9A1qAOq7bk39oQiZXXaQwvb.8o5.xO",
+			want:    "2b",
 			wantErr: nil,
 		},
 		{
@@ -44,6 +44,52 @@ func Test_BCrypt_Version(t *testing.T) {
 			b := BCrypt()
 			in := []byte(tt.in)
 			got, err := b.Version(in)
+			if !reflect.DeepEqual(err, tt.wantErr) {
+				t.Fatalf("Version(%v)=_, %#v; want %#v", in, err, tt.wantErr)
+			}
+			if string(got) != tt.want {
+				t.Errorf("Version(%v)=%s, _; want %s", in, got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_BCrypt_Cost(t *testing.T) {
+	tests := []struct {
+		name    string
+		in      string
+		want    int
+		wantErr error
+	}{
+		{
+			name:    "regular case cost",
+			in:      "$2a$10$Q.Qos4YovNyRzlvHS8Y3LuhnRdyJgEX7IR27.eqLUIq41ktUyUC1y",
+			want:    10,
+			wantErr: nil,
+		},
+		{
+			name:    "regular case cost",
+			in:      "$2b$10$0DGBCMWhzppRvF2yVIIdoee9A1qAOq7bk39oQiZXXaQwvb.8o5.xO",
+			want:    10,
+			wantErr: nil,
+		},
+		//{
+		//	name:    "invalid hash",
+		//	in:      "abcdefgh",
+		//	wantErr: ErrInvalidHash,
+		//},
+		//{
+		//	name:    "invalid version",
+		//	in:      "$3b$10$0DGBCMWhzppRvF2yVIIdoee9A1qAOq7bk39oQiZXXaQwvb.8o5.xO",
+		//	wantErr: ErrInvalidVersion,
+		//},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := BCrypt()
+			in := []byte(tt.in)
+			got, err := b.Cost(in)
 			if !reflect.DeepEqual(err, tt.wantErr) {
 				t.Fatalf("Version(%v)=_, %#v; want %#v", in, err, tt.wantErr)
 			}

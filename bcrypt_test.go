@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"golang.org/x/crypto/bcrypt"
+	libBcrypy "golang.org/x/crypto/bcrypt"
 )
 
 func Test_BCrypt_Version(t *testing.T) {
@@ -121,18 +121,18 @@ func Test_BCrypt_HashPassword(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			b := BCrypt()
-			got, err := b.HashPassword(tt.in)
+			got, err := b.GenerateFromPassword([]byte(tt.in), 10)
 			if !reflect.DeepEqual(err, tt.wantErr) {
-				t.Fatalf("HashPassword(%s)=_, %#v; want %#v", tt.in, err, tt.wantErr)
+				t.Fatalf("GenerateFromPassword(%s)=_, %#v; want %#v", tt.in, err, tt.wantErr)
 			}
 
-			isCorrect, _ := b.IsCorrectPassword(got, tt.in)
+			isCorrect, _ := b.IsCorrectPassword(got, []byte(tt.in))
 			if !isCorrect && tt.wantErr == nil {
-				t.Errorf("IsCorrectPassword(%s, %s)=false, _; want true", got, tt.in)
+				t.Errorf("GenerateFromPassword(%s, %s)=false, _; want true", got, tt.in)
 			}
 
-			cost, _ := bcrypt.Cost([]byte(got))
-			if cost != bcrypt.DefaultCost && tt.wantErr == nil {
+			cost, _ := libBcrypy.Cost([]byte(got))
+			if cost != libBcrypy.DefaultCost && tt.wantErr == nil {
 				t.Errorf("Cost([]byte(%s)=false, _; want true", got)
 			}
 		})
@@ -183,7 +183,7 @@ func Test_BCrypt_IsCorrectPassword(t *testing.T) {
 				"password",
 			},
 			want:    false,
-			wantErr: bcrypt.ErrHashTooShort,
+			wantErr: libBcrypy.ErrHashTooShort,
 		},
 		{
 			name: "mismatched hash and password",
@@ -195,14 +195,14 @@ func Test_BCrypt_IsCorrectPassword(t *testing.T) {
 				"uh4r5CVsd9TXfmPa",
 			},
 			want:    false,
-			wantErr: bcrypt.ErrMismatchedHashAndPassword,
+			wantErr: libBcrypy.ErrMismatchedHashAndPassword,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			b := BCrypt()
-			got, err := b.IsCorrectPassword(tt.in.hashedPassword, tt.in.password)
+			got, err := b.IsCorrectPassword([]byte(tt.in.hashedPassword), []byte(tt.in.password))
 			if !reflect.DeepEqual(err, tt.wantErr) {
 				t.Errorf("IsCorrectPassword(%s, %s)=_, %#v; want %#v", tt.in.hashedPassword, tt.in.password, err, tt.wantErr)
 			}

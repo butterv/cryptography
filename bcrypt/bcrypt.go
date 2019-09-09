@@ -1,4 +1,4 @@
-package cryptography
+package bcrypt
 
 import (
 	"crypto/rand"
@@ -29,9 +29,10 @@ const (
 	DefaultCost int = 10 // the cost that will actually be set if a cost below MinCost is passed into GenerateFromPassword
 )
 
-const alphabet = "./ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+const saltPatten = "./A-Za-z0-9"
+const encodeStd = "./ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 
-var bcEncoding = base64.NewEncoding(alphabet)
+var stdEncoding = base64.NewEncoding(encodeStd)
 
 // magicCipherData is an IV for the 64 Blowfish encryption calls in
 // bcrypt(). It's the string "OrpheanBeholderScryDoubt" in big-endian bytes.
@@ -64,6 +65,16 @@ func BCrypt() *bcryptStruct {
 }
 
 func (*bcryptStruct) GenerateFromPassword(password []byte, cost int) ([]byte, error) {
+	// 引数のパスワードの検証
+	// 指定コストの検証(0~31)
+	// 構造体`hashed`の初期化
+	// major versionの付与(2)
+	// マイナーバージョンの付与(a/b)
+	// コストの付与
+	// ソルトの生成
+	// パスワード、コスト、ソルトでハッシュ化する
+	// ハッシュ値の付与
+
 	if len(password) == 0 {
 		return nil, errors.New("password is empty")
 	}
@@ -87,12 +98,14 @@ func (*bcryptStruct) GenerateFromPassword(password []byte, cost int) ([]byte, er
 	p.cost = cost
 
 	// ソルト
+	// 指定サイズのバイト列
 	unencodedSalt := make([]byte, maxSaltSize)
+	// crypto/rand Reader, io.ReadFullでmaxSaltSize分乱数を生成する
 	_, err = io.ReadFull(rand.Reader, unencodedSalt)
 	if err != nil {
 		return nil, err
 	}
-	// ソルトの付与
+	// 生成してソルトをbase64エンコード
 	p.salt = base64Encode(unencodedSalt)
 
 	// 生パスワード、コスト、ソルトでハッシュ化する
@@ -113,12 +126,18 @@ func checkCost(cost int) error {
 }
 
 func base64Encode(src []byte) []byte {
-	n := bcEncoding.EncodedLen(len(src))
+	// nバイト長の入力バッファをエンコードしたときのバイト数を返します。
+	n := stdEncoding.EncodedLen(len(src))
 	dst := make([]byte, n)
-	bcEncoding.Encode(dst, src)
+	// encを使用してsrcをエンコードしdstへEncodedLen(len(src))バイト書き込みを行います。
+	stdEncoding.Encode(dst, src)
+	// パディングされている分は省く
 	for dst[n-1] == '=' {
 		n--
 	}
+
+	// See: https://play.golang.org/p/5D5McYeNY-V
+
 	return dst[:n]
 }
 
@@ -175,8 +194,8 @@ func base64Decode(src []byte) ([]byte, error) {
 		src = append(src, '=')
 	}
 
-	dst := make([]byte, bcEncoding.DecodedLen(len(src)))
-	n, err := bcEncoding.Decode(dst, src)
+	dst := make([]byte, stdEncoding.DecodedLen(len(src)))
+	n, err := stdEncoding.Decode(dst, src)
 	if err != nil {
 		return nil, err
 	}

@@ -63,73 +63,44 @@ func BCrypt() *bcryptStruct {
 	return &bcryptStruct{}
 }
 
-func (*bcryptStruct) Version(hashedBytes []byte) ([]byte, error) {
-	if hashedBytes[0] != '$' {
-		return nil, ErrInvalidHash
-	}
-
-	if hashedBytes[1] > majorVersion {
-		return nil, ErrInvalidVersion
-	}
-	if hashedBytes[2] != '$' {
-		return hashedBytes[1:3], nil
-	}
-
-	return hashedBytes[1:2], nil
-}
-
-func (*bcryptStruct) Cost(hashedBytes []byte) (int, error) {
-	if len(hashedBytes) < minHashSize {
-		return 0, ErrHashTooShort
-	}
-
-	if hashedBytes[0] != '$' {
-		return 0, ErrInvalidHash
-	}
-
-	if hashedBytes[2] != '$' {
-		cost, err := strconv.Atoi(string(hashedBytes[4:6]))
-		if err != nil {
-			return -1, err
-		}
-		return cost, nil
-	}
-
-	cost, err := strconv.Atoi(string(hashedBytes[5:7]))
-	if err != nil {
-		return -1, err
-	}
-	return cost, nil
-}
-
 func (*bcryptStruct) GenerateFromPassword(password []byte, cost int) ([]byte, error) {
 	if len(password) == 0 {
 		return nil, errors.New("password is empty")
 	}
-
+	// コストのチェック
+	// TODO(istsh): 0~31の範囲に収まっているかの確認だけで十分かも
 	if cost < MinCost {
 		cost = DefaultCost
 	}
+	// 構造体`hashed`の初期化
 	p := new(hashed)
+	// major versionの付与(2)
 	p.major = majorVersion
+	// マイナーバージョンの付与(b)
 	p.minor = minorVersion
-
+	// コストのチェック
 	err := checkCost(cost)
 	if err != nil {
 		return nil, err
 	}
+	// コストの付与
 	p.cost = cost
 
+	// ソルト
 	unencodedSalt := make([]byte, maxSaltSize)
 	_, err = io.ReadFull(rand.Reader, unencodedSalt)
 	if err != nil {
 		return nil, err
 	}
+	// ソルトの付与
 	p.salt = base64Encode(unencodedSalt)
+
+	// 生パスワード、コスト、ソルトでハッシュ化する
 	hash, err := bcrypt(password, p.cost, p.salt)
 	if err != nil {
 		return nil, err
 	}
+	// ハッシュ値の付与
 	p.hash = hash
 	return p.Hash(), err
 }
@@ -213,25 +184,74 @@ func base64Decode(src []byte) ([]byte, error) {
 }
 
 func (p *hashed) Hash() []byte {
+	// 60文字
 	arr := make([]byte, 60)
+	// 1文字目は必ず`$`
 	arr[0] = '$'
+	// major version 2
 	arr[1] = p.major
 	n := 2
 	if p.minor != 0 {
+		// minor version `a`
 		arr[2] = p.minor
 		n = 3
 	}
+	// バージョンの次の文字も必ず`$`
 	arr[n] = '$'
 	n++
+	// `%02d`のフォーマットでコストを付与(2^nのnの数値が入る)
 	copy(arr[n:], []byte(fmt.Sprintf("%02d", p.cost)))
 	n += 2
+	// コストの次の文字も必ず`$`
 	arr[n] = '$'
 	n++
+	// ソルトを付与
 	copy(arr[n:], p.salt)
 	n += encodedSaltSize
+	// パスワードのハッシュ値を付与
 	copy(arr[n:], p.hash)
 	n += encodedHashSize
+	// 結果を返却
 	return arr[:n]
+}
+
+func (*bcryptStruct) Version(hashedBytes []byte) ([]byte, error) {
+	if hashedBytes[0] != '$' {
+		return nil, ErrInvalidHash
+	}
+
+	if hashedBytes[1] > majorVersion {
+		return nil, ErrInvalidVersion
+	}
+	if hashedBytes[2] != '$' {
+		return hashedBytes[1:3], nil
+	}
+
+	return hashedBytes[1:2], nil
+}
+
+func (*bcryptStruct) Cost(hashedBytes []byte) (int, error) {
+	if len(hashedBytes) < minHashSize {
+		return 0, ErrHashTooShort
+	}
+
+	if hashedBytes[0] != '$' {
+		return 0, ErrInvalidHash
+	}
+
+	if hashedBytes[2] != '$' {
+		cost, err := strconv.Atoi(string(hashedBytes[4:6]))
+		if err != nil {
+			return -1, err
+		}
+		return cost, nil
+	}
+
+	cost, err := strconv.Atoi(string(hashedBytes[5:7]))
+	if err != nil {
+		return -1, err
+	}
+	return cost, nil
 }
 
 func (*bcryptStruct) IsCorrectPassword(hashedPassword, password []byte) (bool, error) {

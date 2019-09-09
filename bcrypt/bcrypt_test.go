@@ -1,4 +1,4 @@
-package cryptography
+package bcrypt
 
 import (
 	"errors"

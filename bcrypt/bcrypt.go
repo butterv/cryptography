@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+
+	"golang.org/x/crypto/blowfish"
 )
 
 const (
@@ -17,10 +19,11 @@ const (
 	encodedSaltSize    = 22
 	encodedHashSize    = 31
 	minHashSize        = 59
+	hashSize           = 60
 )
 
 const (
-	MinCost     uint = 4  // the minimum allowable cost as passed in to GenerateFromPassword
+	MinCost     uint = 0  // the minimum allowable cost as passed in to GenerateFromPassword
 	MaxCost     uint = 31 // the maximum allowable cost as passed in to GenerateFromPassword
 	DefaultCost uint = 10 // the cost that will actually be set if a cost below MinCost is passed into GenerateFromPassword
 )
@@ -97,7 +100,12 @@ func generateHash(password []byte, cost uint) ([]byte, error) {
 	}
 	p.salt = salt
 	// パスワード、コスト、ソルトでハッシュ化する
-	// ハッシュ値の付与
+	hash, err := bcrypt(password, p.cost, p.salt)
+	if err != nil {
+		return nil, err
+	}
+	p.hash = hash
+	// ハッシュ値の生成
 	return p.Hash(), nil
 }
 
@@ -125,122 +133,85 @@ func base64Encode(src []byte) []byte {
 	return dst[:n]
 }
 
-//func (*bcryptStruct) GenerateFromPassword(password []byte, cost int) ([]byte, error) {
-//
-//	if len(password) == 0 {
-//		return nil, errors.New("password is empty")
-//	}
-//	// コストのチェック
-//	// TODO(istsh): 0~31の範囲に収まっているかの確認だけで十分かも
-//	if cost < MinCost {
-//		cost = DefaultCost
-//	}
-//	// 構造体`hashed`の初期化
-//	p := new(hashed)
-//	// major versionの付与(2)
-//	p.major = majorVersion
-//	// マイナーバージョンの付与(b)
-//	p.minor = minorVersion
-//	// コストのチェック
-//	err := checkCost(cost)
-//	if err != nil {
-//		return nil, err
-//	}
-//	// コストの付与
-//	p.cost = cost
-//
-//	// ソルト
-//	// 指定サイズのバイト列
-//	unencodedSalt := make([]byte, maxSaltSize)
-//	// crypto/rand Reader, io.ReadFullでmaxSaltSize分乱数を生成する
-//	_, err = io.ReadFull(rand.Reader, unencodedSalt)
-//	if err != nil {
-//		return nil, err
-//	}
-//	// 生成してソルトをbase64エンコード
-//	p.salt = base64Encode(unencodedSalt)
-//
-//	// 生パスワード、コスト、ソルトでハッシュ化する
-//	hash, err := bcrypt(password, p.cost, p.salt)
-//	if err != nil {
-//		return nil, err
-//	}
-//	// ハッシュ値の付与
-//	p.hash = hash
-//	return p.Hash(), err
-//}
-//
-//func checkCost(cost int) error {
-//	if cost < MinCost || cost > MaxCost {
-//		return errors.New("invalid cost")
-//	}
-//	return nil
-//}
-//
-//func bcrypt(password []byte, cost int, salt []byte) ([]byte, error) {
-//	cipherData := make([]byte, len(magicCipherData))
-//	copy(cipherData, magicCipherData)
-//
-//	c, err := expensiveBlowfishSetup(password, uint32(cost), salt)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	for i := 0; i < 24; i += 8 {
-//		for j := 0; j < 64; j++ {
-//			c.Encrypt(cipherData[i:i+8], cipherData[i:i+8])
-//		}
-//	}
-//
-//	// Bug compatibility with C bcrypt implementations. We only encode 23 of
-//	// the 24 bytes encrypted.
-//	hsh := base64Encode(cipherData[:maxCryptedHashSize])
-//	return hsh, nil
-//}
-//
-//func expensiveBlowfishSetup(key []byte, cost uint32, salt []byte) (*blowfish.Cipher, error) {
-//	csalt, err := base64Decode(salt)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	// Bug compatibility with C bcrypt implementations. They use the trailing
-//	// NULL in the key string during expansion.
-//	// We copy the key to prevent changing the underlying array.
-//	ckey := append(key[:len(key):len(key)], 0)
-//
-//	c, err := blowfish.NewSaltedCipher(ckey, csalt)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	var i, rounds uint64
-//	rounds = 1 << cost
-//	for i = 0; i < rounds; i++ {
-//		blowfish.ExpandKey(ckey, c)
-//		blowfish.ExpandKey(csalt, c)
-//	}
-//
-//	return c, nil
-//}
-//
-//func base64Decode(src []byte) ([]byte, error) {
-//	numOfEquals := 4 - (len(src) % 4)
-//	for i := 0; i < numOfEquals; i++ {
-//		src = append(src, '=')
-//	}
-//
-//	dst := make([]byte, stdEncoding.DecodedLen(len(src)))
-//	n, err := stdEncoding.Decode(dst, src)
-//	if err != nil {
-//		return nil, err
-//	}
-//	return dst[:n], nil
-//}
+func bcrypt(password []byte, cost uint, salt []byte) ([]byte, error) {
+	cipherData := make([]byte, len(magicCipherData))
+	copy(cipherData, magicCipherData)
+
+	c, err := expensiveBlowfishSetup(password, uint32(cost), salt)
+	if err != nil {
+		return nil, err
+	}
+
+	// この数字の意味は？
+	// iは3loop, jは64loopで計192loopする
+	for i := 0; i < 24; i += 8 {
+		for j := 0; j < 64; j++ {
+			// ??
+			c.Encrypt(cipherData[i:i+8], cipherData[i:i+8])
+		}
+	}
+
+	// Bug compatibility with C bcrypt implementations. We only encode 23 of
+	// the 24 bytes encrypted.
+	hsh := base64Encode(cipherData[:maxCryptedHashSize])
+	return hsh, nil
+}
+
+func expensiveBlowfishSetup(key []byte, cost uint32, salt []byte) (*blowfish.Cipher, error) {
+	// saltをデコードする
+	csalt, err := base64Decode(salt)
+	if err != nil {
+		return nil, err
+	}
+
+	// Bug compatibility with C bcrypt implementations. They use the trailing
+	// NULL in the key string during expansion.
+	// We copy the key to prevent changing the underlying array.
+	ckey := append(key[:len(key):len(key)], 0)
+
+	// ??
+	c, err := blowfish.NewSaltedCipher(ckey, csalt)
+	if err != nil {
+		return nil, err
+	}
+
+	var i, rounds uint64
+	// <<はシフト演算
+	// e.g.
+	// 10 >> 1 => 10を2進数で表現すると1010で、それを右に1bitシフトすると101なので5
+	// 10 << 2 => 1010を左に2bitシフトすると、101000なので40
+	// この場合は1を左にcost分シフトする。
+	// roundsが符号なし(uint)か符号あり(int)かによってシフト後の数値は変わる
+	rounds = 1 << cost
+	for i = 0; i < rounds; i++ {
+		// ??
+		blowfish.ExpandKey(ckey, c)
+		// ??
+		blowfish.ExpandKey(csalt, c)
+	}
+
+	return c, nil
+}
+
+func base64Decode(src []byte) ([]byte, error) {
+	numOfEquals := 4 - (len(src) % 4)
+	// パディングを除去しているので元に戻す
+	for i := 0; i < numOfEquals; i++ {
+		src = append(src, '=')
+	}
+
+	// シンプルにエンコードと逆のことをやっている
+	dst := make([]byte, stdEncoding.DecodedLen(len(src)))
+	n, err := stdEncoding.Decode(dst, src)
+	if err != nil {
+		return nil, err
+	}
+	return dst[:n], nil
+}
 
 func (p *hashed) Hash() []byte {
 	// 60文字
-	arr := make([]byte, 60)
+	arr := make([]byte, hashSize)
 	// 1文字目は必ず`$`
 	arr[0] = '$'
 	// major version 2

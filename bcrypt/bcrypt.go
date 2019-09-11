@@ -241,6 +241,17 @@ func (p *hashed) Hash() []byte {
 	return arr[:n]
 }
 
+func CompareHashAndPassword(hashedPassword, password string) error {
+	// TODO:
+	// 1. hashedPasswordからversion, cost, saltを抽出
+	// 2. bcryptでpasswordをハッシュ化
+	// 3. hashedPasswordと比較して一致しているか確認
+	//if subtle.ConstantTimeCompare(p.Hash(), otherP.Hash()) == 1 {
+	//	return nil
+	//}
+	return nil
+}
+
 //
 //func (*bcryptStruct) Version(hashedBytes []byte) ([]byte, error) {
 //	if hashedBytes[0] != '$' {

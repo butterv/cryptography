@@ -57,6 +57,98 @@ func (e ErrInvalidCost) Error() string {
 	return fmt.Sprintf("bcrypt: cost %d is out of range. allowed %d to %d", e, MinCost, MaxCost)
 }
 
+func CompareHashAndPassword(hashedPassword, password string) error {
+	hashedBytes := []byte(hashedPassword)
+
+	if len(hashedBytes) < hashSize {
+		return ErrHashTooShort
+	}
+
+	// パスワード部のハッシュ値が一致するかどうかを判定すればいいので、
+	// バージョンは不要
+	//version, err := version(hashedBytes)
+	//if err != nil {
+	//	return err
+	//}
+
+	cost, err := cost(hashedBytes)
+	if err != nil {
+		return err
+	}
+
+	// TODO: start num
+	salt := hashedBytes[7 : 7+22]
+
+	// TODO:
+	// costは同じ値を使う必要があるが、2**cost分ストレッチングする必要があるか
+	// パスワード部のハッシュ値を求めるのに同じ回数ストレッチングする必要がある？
+	// このbcrypt関数の内部で何が行われているか、正確に理解する必要がある。
+	hashed, err := bcrypt([]byte(password), cost, salt)
+	if err != nil {
+		return err
+	}
+
+	if subtle.ConstantTimeCompare(hashedBytes, hashed) == 1 {
+		return nil
+	}
+
+	return ErrMismatchedHashAndPassword
+}
+
+func version(hashedBytes []byte) ([]byte, error) {
+	if hashedBytes[0] != '$' {
+		return nil, ErrInvalidHash
+	}
+
+	if hashedBytes[1] > majorVersion {
+		return nil, ErrInvalidVersion
+	}
+	if hashedBytes[2] != '$' {
+		return hashedBytes[1:3], nil
+	}
+
+	return hashedBytes[1:2], nil
+}
+
+func cost(hashedBytes []byte) (uint, error) {
+	if len(hashedBytes) < minHashSize {
+		return 0, ErrHashTooShort
+	}
+
+	if hashedBytes[0] != '$' {
+		return 0, ErrInvalidHash
+	}
+
+	if hashedBytes[2] != '$' {
+		cost, err := strconv.Atoi(string(hashedBytes[4:6]))
+		if err != nil {
+			return -1, err
+		}
+		return uint(cost), nil
+	}
+
+	cost, err := strconv.Atoi(string(hashedBytes[5:7]))
+	if err != nil {
+		return -1, err
+	}
+	return uint(cost), nil
+}
+
+//func (*bcryptStruct) IsCorrectPassword(hashedPassword, password []byte) (bool, error) {
+//	if len(hashedPassword) == 0 {
+//		return false, errors.New("hashedPassword is empty")
+//	}
+//	if len(password) == 0 {
+//		return false, errors.New("password is empty")
+//	}
+//	if err := libBcrypt.CompareHashAndPassword(hashedPassword, password); err != nil {
+//		return false, err
+//	}
+//	return true, nil
+//}
+
+// これ以降に実装を追加していく
+
 type hashed struct {
 	majorVersion byte
 	minorVersion byte
@@ -242,93 +334,3 @@ func (p *hashed) Hash() []byte {
 	// 結果を返却
 	return arr[:n]
 }
-
-func CompareHashAndPassword(hashedPassword, password string) error {
-	hashedBytes := []byte(hashedPassword)
-
-	if len(hashedBytes) < hashSize {
-		return ErrHashTooShort
-	}
-
-	// パスワード部のハッシュ値が一致するかどうかを判定すればいいので、
-	// バージョンは不要
-	//version, err := version(hashedBytes)
-	//if err != nil {
-	//	return err
-	//}
-
-	cost, err := cost(hashedBytes)
-	if err != nil {
-		return err
-	}
-
-	// TODO: start num
-	salt := hashedBytes[7 : 7+22]
-
-	// TODO:
-	// costは同じ値を使う必要があるが、2**cost分ストレッチングする必要があるか
-	// パスワード部のハッシュ値を求めるのに同じ回数ストレッチングする必要がある？
-	// このbcrypt関数の内部で何が行われているか、正確に理解する必要がある。
-	hashed, err := bcrypt([]byte(password), cost, salt)
-	if err != nil {
-		return err
-	}
-
-	if subtle.ConstantTimeCompare(hashedBytes, hashed) == 1 {
-		return nil
-	}
-
-	return ErrMismatchedHashAndPassword
-}
-
-func version(hashedBytes []byte) ([]byte, error) {
-	if hashedBytes[0] != '$' {
-		return nil, ErrInvalidHash
-	}
-
-	if hashedBytes[1] > majorVersion {
-		return nil, ErrInvalidVersion
-	}
-	if hashedBytes[2] != '$' {
-		return hashedBytes[1:3], nil
-	}
-
-	return hashedBytes[1:2], nil
-}
-
-func cost(hashedBytes []byte) (uint, error) {
-	if len(hashedBytes) < minHashSize {
-		return 0, ErrHashTooShort
-	}
-
-	if hashedBytes[0] != '$' {
-		return 0, ErrInvalidHash
-	}
-
-	if hashedBytes[2] != '$' {
-		cost, err := strconv.Atoi(string(hashedBytes[4:6]))
-		if err != nil {
-			return -1, err
-		}
-		return uint(cost), nil
-	}
-
-	cost, err := strconv.Atoi(string(hashedBytes[5:7]))
-	if err != nil {
-		return -1, err
-	}
-	return uint(cost), nil
-}
-
-//func (*bcryptStruct) IsCorrectPassword(hashedPassword, password []byte) (bool, error) {
-//	if len(hashedPassword) == 0 {
-//		return false, errors.New("hashedPassword is empty")
-//	}
-//	if len(password) == 0 {
-//		return false, errors.New("password is empty")
-//	}
-//	if err := libBcrypt.CompareHashAndPassword(hashedPassword, password); err != nil {
-//		return false, err
-//	}
-//	return true, nil
-//}

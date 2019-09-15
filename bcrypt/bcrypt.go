@@ -35,8 +35,8 @@ const encodeStd = "./ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456
 
 var stdEncoding = base64.NewEncoding(encodeStd)
 
-// magicCipherData is an IV for the 64 Blowfish encryption calls in
-// bcrypt(). It's the string "OrpheanBeholderScryDoubt" in big-endian bytes.
+// "OrpheanBeholderScryDoubt"という文字列のバイト配列
+// https://play.golang.org/p/AtRJ6WdnC4c
 var magicCipherData = []byte{
 	0x4f, 0x72, 0x70, 0x68,
 	0x65, 0x61, 0x6e, 0x42,
@@ -204,11 +204,13 @@ func generateHash(password []byte, cost uint) ([]byte, error) {
 }
 
 func makeSalt() ([]byte, error) {
+	// maxSaltSize分配列を確保する
 	unencodedSalt := make([]byte, maxSaltSize)
+	// unencodedSaltを全てランダムな文字で埋める
 	if _, err := io.ReadFull(rand.Reader, unencodedSalt); err != nil {
 		return nil, err
 	}
-
+	// unencodedSaltをbase64Encodeする
 	return base64Encode(unencodedSalt), nil
 }
 
@@ -238,9 +240,18 @@ func bcrypt(password []byte, cost uint, salt []byte) ([]byte, error) {
 
 	// この数字の意味は？
 	// iは3loop, jは64loopで計192loopする
+	// See: https://ja.wikipedia.org/wiki/Bcrypt
+	// bcryptのアルゴリズムは`OrpheanBeholderScryDoubt`を
+	// Blowfishを用いて64回暗号化した文字列を作成する。
+	// bcryptでは通常のBlowfishの鍵セットアップ関数をコストが高価な（expensive key setup）
+	// EksBlowfishSetup関数に置き換えている:
+
+	// "OrpheanBeholderScryDoubt"という文字列を使って64回暗号化する
+	// c.Encryptは8byteずつ処理されるので、8文字ごとに64回暗号化している
 	for i := 0; i < 24; i += 8 {
 		for j := 0; j < 64; j++ {
-			// ??
+			// 内部でひたすらシフト演算を繰り返し、引数を上書いている
+			// Decryptは同じ値の逆シフト演算をするので、元に戻るという仕組み
 			c.Encrypt(cipherData[i:i+8], cipherData[i:i+8])
 		}
 	}
@@ -278,9 +289,9 @@ func expensiveBlowfishSetup(key []byte, cost uint32, salt []byte) (*blowfish.Cip
 	// roundsが符号なし(uint)か符号あり(int)かによってシフト後の数値は変わる
 	rounds = 1 << cost
 	for i = 0; i < rounds; i++ {
-		// ??
+		// パスワードを暗号化する
 		blowfish.ExpandKey(ckey, c)
-		// ??
+		// ソルトを暗号化する
 		blowfish.ExpandKey(csalt, c)
 	}
 

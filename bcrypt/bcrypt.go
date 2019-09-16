@@ -79,15 +79,14 @@ func CompareHashAndPassword(hashedPassword, password string) error {
 	// TODO: start num
 	salt := hashedBytes[7 : 7+22]
 
-	// TODO:
-	// costは同じ値を使う必要があるが、2**cost分ストレッチングする必要があるか
-	// パスワード部のハッシュ値を求めるのに同じ回数ストレッチングする必要がある？
-	// このbcrypt関数の内部で何が行われているか、正確に理解する必要がある。
+	// 同じコストとソルトを用いてハッシュ化
 	hashed, err := bcrypt([]byte(password), cost, salt)
 	if err != nil {
 		return err
 	}
 
+	// 2つのハッシュ値を比較
+	// TODO: パスワード部のみ比較すればいい
 	if subtle.ConstantTimeCompare(hashedBytes, hashed) == 1 {
 		return nil
 	}
@@ -180,25 +179,28 @@ func GenerateFromPassword(password string, cost uint) (string, error) {
 
 func generateHash(password []byte, cost uint) ([]byte, error) {
 	// 構造体`hashed`の初期化
-	p := new(hashed)
+	p := hashed{}
 	// major versionの付与(2)
 	p.majorVersion = majorVersion
 	// マイナーバージョンの付与(a/b)
 	p.minorVersion = minorVersion
 	// コストの付与
 	p.cost = cost
+
 	// ソルトの生成
 	salt, err := makeSalt()
 	if err != nil {
 		return nil, err
 	}
 	p.salt = salt
+
 	// パスワード、コスト、ソルトでハッシュ化する
 	hash, err := bcrypt(password, p.cost, p.salt)
 	if err != nil {
 		return nil, err
 	}
 	p.hash = hash
+
 	// ハッシュ値の生成
 	return p.Hash(), nil
 }

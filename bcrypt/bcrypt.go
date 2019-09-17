@@ -153,7 +153,7 @@ type hashed struct {
 	minorVersion byte
 	cost         uint
 	salt         []byte
-	hash         []byte
+	passwordHash []byte
 }
 
 func GenerateFromPassword(password string, cost uint) (string, error) {
@@ -178,28 +178,26 @@ func GenerateFromPassword(password string, cost uint) (string, error) {
 }
 
 func generateHash(password []byte, cost uint) ([]byte, error) {
-	// 構造体`hashed`の初期化
-	p := hashed{}
-	// major versionの付与(2)
-	p.majorVersion = majorVersion
-	// マイナーバージョンの付与(a/b)
-	p.minorVersion = minorVersion
-	// コストの付与
-	p.cost = cost
-
 	// ソルトの生成
 	salt, err := makeSalt()
 	if err != nil {
 		return nil, err
 	}
-	p.salt = salt
 
 	// パスワード、コスト、ソルトでハッシュ化する
-	hash, err := bcrypt(password, p.cost, p.salt)
+	passwordHash, err := bcrypt(password, cost, salt)
 	if err != nil {
 		return nil, err
 	}
-	p.hash = hash
+
+	// 構造体`hashed`の初期化
+	p := hashed{
+		majorVersion: majorVersion, // major versionの付与
+		minorVersion: minorVersion, // minor versionの付与(a/b)
+		cost:         cost,         // cost
+		salt:         salt,
+		passwordHash: passwordHash,
+	}
 
 	// ハッシュ値の生成
 	return p.Hash(), nil
@@ -342,7 +340,7 @@ func (p *hashed) Hash() []byte {
 	copy(arr[n:], p.salt)
 	n += encodedSaltSize
 	// パスワードのハッシュ値を付与
-	copy(arr[n:], p.hash)
+	copy(arr[n:], p.passwordHash)
 	n += encodedHashSize
 	// 結果を返却
 	return arr[:n]

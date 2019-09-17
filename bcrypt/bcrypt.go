@@ -2,12 +2,10 @@ package bcrypt
 
 import (
 	"crypto/rand"
-	"crypto/subtle"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
-	"strconv"
 
 	"golang.org/x/crypto/blowfish"
 )
@@ -74,67 +72,67 @@ func CompareHashAndPassword(hashedPassword, password string) error {
 	//	return err
 	//}
 
-	cost, err := cost(hashedBytes)
-	if err != nil {
-		return err
-	}
+	//cost, err := cost(hashedBytes)
+	//if err != nil {
+	//	return err
+	//}
 
 	// TODO: start num
-	salt := hashedBytes[7 : 7+22]
-
-	// 同じコストとソルトを用いてハッシュ化
-	hashed, err := bcrypt([]byte(password), cost, salt)
-	if err != nil {
-		return err
-	}
-
-	// 2つのハッシュ値を比較
-	// TODO: パスワード部のみ比較すればいい
-	if subtle.ConstantTimeCompare(hashedBytes, hashed) == 1 {
-		return nil
-	}
+	//salt := hashedBytes[7 : 7+22]
+	//
+	//// 同じコストとソルトを用いてハッシュ化
+	//hashed, err := bcrypt([]byte(password), cost, salt)
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//// 2つのハッシュ値を比較
+	//// TODO: パスワード部のみ比較すればいい
+	//if subtle.ConstantTimeCompare(hashedBytes, hashed) == 1 {
+	//	return nil
+	//}
 
 	return ErrMismatchedHashAndPassword
 }
 
-func version(hashedBytes []byte) ([]byte, error) {
-	if hashedBytes[0] != '$' {
-		return nil, ErrInvalidHash
-	}
-
-	if hashedBytes[1] > majorVersion {
-		return nil, ErrInvalidVersion
-	}
-	if hashedBytes[2] != '$' {
-		return hashedBytes[1:3], nil
-	}
-
-	return hashedBytes[1:2], nil
-}
-
-func cost(hashedBytes []byte) (uint, error) {
-	if len(hashedBytes) < minHashSize {
-		return 0, ErrHashTooShort
-	}
-
-	if hashedBytes[0] != '$' {
-		return 0, ErrInvalidHash
-	}
-
-	if hashedBytes[2] != '$' {
-		cost, err := strconv.Atoi(string(hashedBytes[4:6]))
-		if err != nil {
-			return -1, err
-		}
-		return uint(cost), nil
-	}
-
-	cost, err := strconv.Atoi(string(hashedBytes[5:7]))
-	if err != nil {
-		return -1, err
-	}
-	return uint(cost), nil
-}
+//func version(hashedBytes []byte) ([]byte, error) {
+//	if hashedBytes[0] != '$' {
+//		return nil, ErrInvalidHash
+//	}
+//
+//	if hashedBytes[1] > majorVersion {
+//		return nil, ErrInvalidVersion
+//	}
+//	if hashedBytes[2] != '$' {
+//		return hashedBytes[1:3], nil
+//	}
+//
+//	return hashedBytes[1:2], nil
+//}
+//
+//func cost(hashedBytes []byte) (uint, error) {
+//	if len(hashedBytes) < minHashSize {
+//		return 0, ErrHashTooShort
+//	}
+//
+//	if hashedBytes[0] != '$' {
+//		return 0, ErrInvalidHash
+//	}
+//
+//	if hashedBytes[2] != '$' {
+//		cost, err := strconv.Atoi(string(hashedBytes[4:6]))
+//		if err != nil {
+//			return -1, err
+//		}
+//		return uint(cost), nil
+//	}
+//
+//	cost, err := strconv.Atoi(string(hashedBytes[5:7]))
+//	if err != nil {
+//		return -1, err
+//	}
+//	return uint(cost), nil
+//}
 
 //func (*bcryptStruct) IsCorrectPassword(hashedPassword, password []byte) (bool, error) {
 //	if len(hashedPassword) == 0 {

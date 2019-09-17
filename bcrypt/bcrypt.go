@@ -51,6 +51,9 @@ var ErrHashTooShort = errors.New("crypto/bcrypt: hashedSecret too short to be a 
 var ErrInvalidHash = errors.New("crypto/bcrypt: invalid hashedPassword")
 var ErrInvalidVersion = errors.New("crypto/bcrypt: invalid version")
 
+var ErrPasswordIsEmpty = errors.New("password is empty")
+var ErrPasswordTooLong = errors.New("password is too long")
+
 type ErrInvalidCost uint
 
 func (e ErrInvalidCost) Error() string {
@@ -158,12 +161,12 @@ type hashed struct {
 
 func GenerateFromPassword(password string, cost uint) (string, error) {
 	if len(password) == 0 {
-		return "", errors.New("password is empty")
+		return "", ErrPasswordIsEmpty
 	}
 	if len(password) > 72 {
 		// TODO エラーにする必要はない
 		// bcryptは73文字以降を無視してしまう
-		return "", errors.New("password is too long")
+		return "", ErrPasswordTooLong
 	}
 	if cost < MinCost || cost > MaxCost {
 		// costが0~31なのは、

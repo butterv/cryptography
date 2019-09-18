@@ -2,10 +2,12 @@ package bcrypt
 
 import (
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 
 	"golang.org/x/crypto/blowfish"
 )
@@ -58,97 +60,6 @@ func (e ErrInvalidCost) Error() string {
 	return fmt.Sprintf("bcrypt: cost %d is out of range. allowed %d to %d", e, MinCost, MaxCost)
 }
 
-func CompareHashAndPassword(hashedPassword, password string) error {
-	hashedBytes := []byte(hashedPassword)
-
-	if len(hashedBytes) < hashSize {
-		return ErrHashTooShort
-	}
-
-	// パスワード部のハッシュ値が一致するかどうかを判定すればいいので、
-	// バージョンは不要
-	//version, err := version(hashedBytes)
-	//if err != nil {
-	//	return err
-	//}
-
-	//cost, err := cost(hashedBytes)
-	//if err != nil {
-	//	return err
-	//}
-
-	// TODO: start num
-	//salt := hashedBytes[7 : 7+22]
-	//
-	//// 同じコストとソルトを用いてハッシュ化
-	//hashed, err := bcrypt([]byte(password), cost, salt)
-	//if err != nil {
-	//	return err
-	//}
-	//
-	//// 2つのハッシュ値を比較
-	//// TODO: パスワード部のみ比較すればいい
-	//if subtle.ConstantTimeCompare(hashedBytes, hashed) == 1 {
-	//	return nil
-	//}
-
-	return ErrMismatchedHashAndPassword
-}
-
-//func version(hashedBytes []byte) ([]byte, error) {
-//	if hashedBytes[0] != '$' {
-//		return nil, ErrInvalidHash
-//	}
-//
-//	if hashedBytes[1] > majorVersion {
-//		return nil, ErrInvalidVersion
-//	}
-//	if hashedBytes[2] != '$' {
-//		return hashedBytes[1:3], nil
-//	}
-//
-//	return hashedBytes[1:2], nil
-//}
-//
-//func cost(hashedBytes []byte) (uint, error) {
-//	if len(hashedBytes) < minHashSize {
-//		return 0, ErrHashTooShort
-//	}
-//
-//	if hashedBytes[0] != '$' {
-//		return 0, ErrInvalidHash
-//	}
-//
-//	if hashedBytes[2] != '$' {
-//		cost, err := strconv.Atoi(string(hashedBytes[4:6]))
-//		if err != nil {
-//			return -1, err
-//		}
-//		return uint(cost), nil
-//	}
-//
-//	cost, err := strconv.Atoi(string(hashedBytes[5:7]))
-//	if err != nil {
-//		return -1, err
-//	}
-//	return uint(cost), nil
-//}
-
-//func (*bcryptStruct) IsCorrectPassword(hashedPassword, password []byte) (bool, error) {
-//	if len(hashedPassword) == 0 {
-//		return false, errors.New("hashedPassword is empty")
-//	}
-//	if len(password) == 0 {
-//		return false, errors.New("password is empty")
-//	}
-//	if err := libBcrypt.CompareHashAndPassword(hashedPassword, password); err != nil {
-//		return false, err
-//	}
-//	return true, nil
-//}
-
-// これ以降に実装を追加していく
-
 type hashed struct {
 	majorVersion byte
 	minorVersion byte
@@ -157,25 +68,42 @@ type hashed struct {
 	passwordHash []byte
 }
 
-func GenerateFromPassword(password string, cost uint) (string, error) {
+func GenerateHash(password string, cost uint) (string, error) {
+	if err := validatePassword(password); err != nil {
+		return "", err
+	}
+
+	if err := validateCost(cost); err != nil {
+		return "", err
+	}
+
+	hashedBytes, err := generateHash([]byte(password), cost)
+	return string(hashedBytes), err
+}
+
+func validatePassword(password string) error {
 	if len(password) == 0 {
-		return "", ErrPasswordIsEmpty
+		return ErrPasswordIsEmpty
 	}
 	if len(password) > 72 {
 		// TODO エラーにする必要はない
 		// bcryptは73文字以降を無視してしまう
-		return "", ErrPasswordTooLong
+		return ErrPasswordTooLong
 	}
+
+	return nil
+}
+
+func validateCost(cost uint) error {
 	if cost < MinCost || cost > MaxCost {
 		// costが0~31なのは、
 		// int32の最大値が2147483647で、
 		// 0~(2**31-1=2147483647) 回試行する為
 		// オーバーフローしてしまうから。
-		return "", ErrInvalidCost(cost)
+		return ErrInvalidCost(cost)
 	}
 
-	hashedBytes, err := generateHash([]byte(password), cost)
-	return string(hashedBytes), err
+	return nil
 }
 
 func generateHash(password []byte, cost uint) ([]byte, error) {
@@ -185,17 +113,16 @@ func generateHash(password []byte, cost uint) ([]byte, error) {
 		return nil, err
 	}
 
-	// パスワード、コスト、ソルトでハッシュ化する
+	// パスワードをハッシュ化する
 	passwordHash, err := bcrypt(password, cost, salt)
 	if err != nil {
 		return nil, err
 	}
 
-	// 構造体`hashed`の初期化
 	p := hashed{
 		majorVersion: majorVersion, // major versionの付与
 		minorVersion: minorVersion, // minor versionの付与(a/b)
-		cost:         cost,         // cost
+		cost:         cost,
 		salt:         salt,
 		passwordHash: passwordHash,
 	}
@@ -228,6 +155,22 @@ func base64Encode(src []byte) []byte {
 		n--
 	}
 	return dst[:n]
+}
+
+func base64Decode(src []byte) ([]byte, error) {
+	numOfEquals := 4 - (len(src) % 4)
+	// パディングを除去しているので元に戻す
+	for i := 0; i < numOfEquals; i++ {
+		src = append(src, '=')
+	}
+
+	// シンプルにエンコードと逆のことをやっている
+	dst := make([]byte, stdEncoding.DecodedLen(len(src)))
+	n, err := stdEncoding.Decode(dst, src)
+	if err != nil {
+		return nil, err
+	}
+	return dst[:n], nil
 }
 
 func bcrypt(password []byte, cost uint, salt []byte) ([]byte, error) {
@@ -275,7 +218,6 @@ func expensiveBlowfishSetup(key []byte, cost uint32, salt []byte) (*blowfish.Cip
 	// We copy the key to prevent changing the underlying array.
 	ckey := append(key[:len(key):len(key)], 0)
 
-	// ??
 	c, err := blowfish.NewSaltedCipher(ckey, csalt)
 	if err != nil {
 		return nil, err
@@ -297,22 +239,6 @@ func expensiveBlowfishSetup(key []byte, cost uint32, salt []byte) (*blowfish.Cip
 	}
 
 	return c, nil
-}
-
-func base64Decode(src []byte) ([]byte, error) {
-	numOfEquals := 4 - (len(src) % 4)
-	// パディングを除去しているので元に戻す
-	for i := 0; i < numOfEquals; i++ {
-		src = append(src, '=')
-	}
-
-	// シンプルにエンコードと逆のことをやっている
-	dst := make([]byte, stdEncoding.DecodedLen(len(src)))
-	n, err := stdEncoding.Decode(dst, src)
-	if err != nil {
-		return nil, err
-	}
-	return dst[:n], nil
 }
 
 func (p *hashed) Hash() []byte {
@@ -345,4 +271,79 @@ func (p *hashed) Hash() []byte {
 	n += encodedHashSize
 	// 結果を返却
 	return arr[:n]
+}
+
+func IsCorrectPassword(hashedPassword, password string) error {
+	hashedBytes := []byte(hashedPassword)
+
+	if len(hashedBytes) < hashSize {
+		return ErrHashTooShort
+	}
+
+	// ハッシュ値からversionを取得
+	versionBytes, err := version(hashedBytes)
+	if err != nil {
+		return err
+	}
+
+	// ハッシュ値からcostを取得
+	costBytes, err := cost(hashedBytes)
+	if err != nil {
+		return err
+	}
+
+	var n int
+	n++                    // $
+	n += len(versionBytes) // e.g. 2a
+	n++                    // $
+	n += len(costBytes)    // e.g. 04
+	n++
+
+	salt := hashedBytes[n : n+encodedSaltSize+1]
+
+	cost, err := strconv.Atoi(string(costBytes))
+	if err != nil {
+		return err
+	}
+
+	// 同じコストとソルトを用いてハッシュ化
+	passwordHash, err := bcrypt([]byte(password), uint(cost), salt)
+	if err != nil {
+		return err
+	}
+
+	// パスワード部のみ比較
+	if subtle.ConstantTimeCompare(hashedBytes[n+encodedSaltSize+1:], passwordHash) == 1 {
+		return nil
+	}
+
+	return ErrMismatchedHashAndPassword
+}
+
+func version(hashedBytes []byte) ([]byte, error) {
+	if hashedBytes[0] != '$' {
+		return nil, ErrInvalidHash
+	}
+	if hashedBytes[1] > majorVersion {
+		return nil, ErrInvalidVersion
+	}
+	if hashedBytes[2] != '$' {
+		return hashedBytes[1:3], nil
+	}
+
+	return hashedBytes[1:2], nil
+}
+
+func cost(hashedBytes []byte) ([]byte, error) {
+	if hashedBytes[0] != '$' {
+		return nil, ErrInvalidHash
+	}
+
+	if hashedBytes[2] == '$' {
+		// e.g. $2$04...
+		return hashedBytes[3:5], nil
+	}
+
+	// e.g. $2a$04...
+	return hashedBytes[4:6], nil
 }

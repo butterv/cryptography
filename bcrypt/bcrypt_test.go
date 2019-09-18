@@ -75,7 +75,7 @@ func Test_BCrypt_GenerateFromPassword(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := GenerateFromPassword(tt.in.password, tt.in.cost)
+			got, err := GenerateHash(tt.in.password, tt.in.cost)
 			if !reflect.DeepEqual(err, tt.wantErr) {
 				t.Fatalf("GenerateFromPassword(%s, %d)=_, %#v; want %#v", tt.in.password, tt.in.cost, err, tt.wantErr)
 			}

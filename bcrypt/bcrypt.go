@@ -30,7 +30,6 @@ const (
 	DefaultCost uint = 10 // the cost that will actually be set if a cost below MinCost is passed into GenerateFromPassword
 )
 
-const saltPatten = "./A-Za-z0-9"
 const encodeStd = "./ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 
 var stdEncoding = base64.NewEncoding(encodeStd)

@@ -49,7 +49,6 @@ var ErrMismatchedHashAndPassword = errors.New("crypto/bcrypt: hashedPassword is 
 var ErrHashTooShort = errors.New("crypto/bcrypt: hashedSecret too short to be a bcrypted password")
 var ErrInvalidHash = errors.New("crypto/bcrypt: invalid hashedPassword")
 var ErrInvalidVersion = errors.New("crypto/bcrypt: invalid version")
-
 var ErrPasswordIsEmpty = errors.New("password is empty")
 var ErrPasswordTooLong = errors.New("password is too long")
 
@@ -85,7 +84,7 @@ func validatePassword(password string) error {
 		return ErrPasswordIsEmpty
 	}
 	if len(password) > 72 {
-		// TODO エラーにする必要はない
+		// エラーにする必要はない
 		// bcryptは73文字以降を無視してしまう
 		return ErrPasswordTooLong
 	}

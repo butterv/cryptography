@@ -25,9 +25,12 @@ const (
 )
 
 const (
-	MinCost     uint = 4  // the minimum allowable cost as passed in to GenerateFromPassword
-	MaxCost     uint = 31 // the maximum allowable cost as passed in to GenerateFromPassword
-	DefaultCost uint = 10 // the cost that will actually be set if a cost below MinCost is passed into GenerateFromPassword
+	// MinCost is the minimum allowable cost as passed in to GenerateFromPassword
+	MinCost uint = 4
+	// MaxCost is the maximum allowable cost as passed in to GenerateFromPassword
+	MaxCost uint = 31
+	// DefaultCost is the cost that will actually be set if a cost below MinCost is passed into GenerateFromPassword
+	DefaultCost uint = 10
 )
 
 const encodeStd = "./ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
@@ -45,16 +48,16 @@ var magicCipherData = []byte{
 	0x6f, 0x75, 0x62, 0x74,
 }
 
-var ErrMismatchedHashAndPassword = errors.New("crypto/bcrypt: hashedPassword is not the hash of the given password")
-var ErrHashTooShort = errors.New("crypto/bcrypt: hashedSecret too short to be a bcrypted password")
-var ErrInvalidHash = errors.New("crypto/bcrypt: invalid hashedPassword")
-var ErrInvalidVersion = errors.New("crypto/bcrypt: invalid version")
-var ErrPasswordIsEmpty = errors.New("password is empty")
-var ErrPasswordTooLong = errors.New("password is too long")
+var errMismatchedHashAndPassword = errors.New("crypto/bcrypt: hashedPassword is not the hash of the given password")
+var errHashTooShort = errors.New("crypto/bcrypt: hashedSecret too short to be a bcrypted password")
+var errInvalidHash = errors.New("crypto/bcrypt: invalid hashedPassword")
+var errInvalidVersion = errors.New("crypto/bcrypt: invalid version")
+var errPasswordIsEmpty = errors.New("password is empty")
+var errPasswordTooLong = errors.New("password is too long")
 
-type ErrInvalidCost uint
+type errInvalidCost uint
 
-func (e ErrInvalidCost) Error() string {
+func (e errInvalidCost) Error() string {
 	return fmt.Sprintf("bcrypt: cost %d is out of range. allowed %d to %d", e, MinCost, MaxCost)
 }
 
@@ -66,6 +69,7 @@ type hashed struct {
 	passwordHash []byte
 }
 
+// GenerateHash generates hash value from raw password.
 func GenerateHash(password string, cost uint) (string, error) {
 	if err := validatePassword(password); err != nil {
 		return "", err
@@ -81,12 +85,12 @@ func GenerateHash(password string, cost uint) (string, error) {
 
 func validatePassword(password string) error {
 	if len(password) == 0 {
-		return ErrPasswordIsEmpty
+		return errPasswordIsEmpty
 	}
 	if len(password) > 72 {
 		// エラーにする必要はない
 		// bcryptは73文字以降を無視してしまう
-		return ErrPasswordTooLong
+		return errPasswordTooLong
 	}
 
 	return nil
@@ -98,7 +102,7 @@ func validateCost(cost uint) error {
 		// int32の最大値が2147483647で、
 		// 0~(2**31-1=2147483647) 回試行する為
 		// オーバーフローしてしまうから。
-		return ErrInvalidCost(cost)
+		return errInvalidCost(cost)
 	}
 
 	return nil
@@ -271,11 +275,12 @@ func (p *hashed) Hash() []byte {
 	return arr[:n]
 }
 
+// IsCorrectPassword compares hashed value and raw password.
 func IsCorrectPassword(hashedPassword, password string) error {
 	hashedBytes := []byte(hashedPassword)
 
 	if len(hashedBytes) < hashSize {
-		return ErrHashTooShort
+		return errHashTooShort
 	}
 
 	// ハッシュ値からversionを取得
@@ -315,15 +320,15 @@ func IsCorrectPassword(hashedPassword, password string) error {
 		return nil
 	}
 
-	return ErrMismatchedHashAndPassword
+	return errMismatchedHashAndPassword
 }
 
 func version(hashedBytes []byte) ([]byte, error) {
 	if hashedBytes[0] != '$' {
-		return nil, ErrInvalidHash
+		return nil, errInvalidHash
 	}
 	if hashedBytes[1] > majorVersion {
-		return nil, ErrInvalidVersion
+		return nil, errInvalidVersion
 	}
 	if hashedBytes[2] != '$' {
 		return hashedBytes[1:3], nil
@@ -334,7 +339,7 @@ func version(hashedBytes []byte) ([]byte, error) {
 
 func cost(hashedBytes []byte) ([]byte, error) {
 	if hashedBytes[0] != '$' {
-		return nil, ErrInvalidHash
+		return nil, errInvalidHash
 	}
 
 	if hashedBytes[2] == '$' {

@@ -23,7 +23,7 @@ func Test_BCrypt_GenerateFromPassword(t *testing.T) {
 				cost     uint
 			}{
 				"11111111",
-				0,
+				4,
 			},
 			wantErr: nil,
 		},
@@ -45,9 +45,9 @@ func Test_BCrypt_GenerateFromPassword(t *testing.T) {
 				cost     uint
 			}{
 				"",
-				0,
+				4,
 			},
-			wantErr: ErrPasswordIsEmpty,
+			wantErr: errPasswordIsEmpty,
 		},
 		{
 			name: "password too long",
@@ -56,9 +56,9 @@ func Test_BCrypt_GenerateFromPassword(t *testing.T) {
 				cost     uint
 			}{
 				"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijk",
-				0,
+				4,
 			},
-			wantErr: ErrPasswordTooLong,
+			wantErr: errPasswordTooLong,
 		},
 		{
 			name: "invalid cost",
@@ -69,7 +69,7 @@ func Test_BCrypt_GenerateFromPassword(t *testing.T) {
 				"abcdefgh",
 				32,
 			},
-			wantErr: ErrInvalidCost(32),
+			wantErr: errInvalidCost(32),
 		},
 	}
 
@@ -113,7 +113,7 @@ func Test_BCrypt_IsCorrectPassword(t *testing.T) {
 				passwordHash string
 				password     string
 			}{
-				"$2a$04$Bza.rhCKUi3KPYLP/3xWyuhjeQI6ZQMc3duEg2NyWvG0RwjllK.Me",
+				"$2a$04$DtzdGW/0HF6SEE5yYsAFee7C/xkgRD2if0rAsu3/.gmj8NxWZAbPq",
 				"11111111",
 			},
 			wantErr: nil,
@@ -138,7 +138,7 @@ func Test_BCrypt_IsCorrectPassword(t *testing.T) {
 				"$2a$11$.uxjK2m8ZJHvj5sSSOt7.u8cFC5IDo7N1fRg2qbETdZmlCn2OFv",
 				"",
 			},
-			wantErr: ErrHashTooShort,
+			wantErr: errHashTooShort,
 		},
 		{
 			name: "password is empty",
@@ -149,7 +149,7 @@ func Test_BCrypt_IsCorrectPassword(t *testing.T) {
 				"$2a$11$.uxjK2m8ZJHvj5sSSOt7.u8cFC5IDo7N1fRg2qbETdZmlCn2OFvui",
 				"ce249uf21FCerv8u4WEFVDc8uc782fcwEC",
 			},
-			wantErr: ErrPasswordIsEmpty,
+			wantErr: errPasswordIsEmpty,
 		},
 		{
 			name: "mismatched password hash and password",
@@ -160,7 +160,7 @@ func Test_BCrypt_IsCorrectPassword(t *testing.T) {
 				"$2a$11$.uxjK2m8ZJHvj5sSSOt7.u8cFC5IDo7N1fRg2qbETdZmlCn2OFvui",
 				"11111111",
 			},
-			wantErr: ErrMismatchedHashAndPassword,
+			wantErr: errMismatchedHashAndPassword,
 		},
 	}
 

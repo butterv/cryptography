@@ -25,7 +25,7 @@ const (
 )
 
 const (
-	MinCost     uint = 0  // the minimum allowable cost as passed in to GenerateFromPassword
+	MinCost     uint = 4  // the minimum allowable cost as passed in to GenerateFromPassword
 	MaxCost     uint = 31 // the maximum allowable cost as passed in to GenerateFromPassword
 	DefaultCost uint = 10 // the cost that will actually be set if a cost below MinCost is passed into GenerateFromPassword
 )
